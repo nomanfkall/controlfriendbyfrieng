@@ -1,21 +1,27 @@
 import streamlit as st
 import random
 import time
-from streamlit_autorefresh import st_autorefresh
+
+# ========== 尝试导入自动刷新模块 ==========
+try:
+    from streamlit_autorefresh import st_autorefresh
+    AUTOREFRESH_AVAILABLE = True
+except ImportError:
+    AUTOREFRESH_AVAILABLE = False
+    st.warning("⚠️ `streamlit-autorefresh` 未安装，自动刷新功能已禁用。")
 
 # ==================== 常量配置 ====================
-MIN_TIMEOUT = 3.0          # 最小自动思考间隔（秒）
-MAX_TIMEOUT = 12.0         # 最大自动思考间隔（秒）
-MAX_MESSAGES = 20          # 消息记录保留条数
-REFRESH_INTERVAL = 1000    # 页面自动刷新间隔（毫秒）
-MOVE_INTERVAL = 2.5        # 角色自动移动间隔（秒）
-SCENE_WIDTH = 600          # 场景宽度（像素）
-SCENE_HEIGHT = 400         # 场景高度（像素）
-CHAR_SIZE = 30             # 角色大小
+MIN_TIMEOUT = 3.0
+MAX_TIMEOUT = 12.0
+MAX_MESSAGES = 20
+REFRESH_INTERVAL = 1000
+MOVE_INTERVAL = 2.5
+SCENE_WIDTH = 600
+SCENE_HEIGHT = 400
+CHAR_SIZE = 30
 
 # ==================== 角色类 ====================
 class ControlFriendByFriend:
-    """像素朋友的核心逻辑，扩充了互动文本"""
     def __init__(self, friend_name: str, friend_age: int,
                  friend_height: float, friend_weight: float):
         self.name = friend_name
@@ -24,7 +30,6 @@ class ControlFriendByFriend:
         self.weight = friend_weight
 
     def speak(self) -> str:
-        """生成聊天消息（扩充）"""
         greetings = [
             f"我是{self.name}，你好啊 user!",
             f"嗨！我是{self.name}，见到你真开心！",
@@ -53,19 +58,17 @@ class ControlFriendByFriend:
             f"我的体重是{self.weight}kg，可别到处说！",
             "体重稳定，吃嘛嘛香～",
         ]
-        lines = [
+        return "\n".join([
             random.choice(greetings),
             random.choice(age_lines),
             random.choice(height_lines),
             random.choice(weight_lines)
-        ]
-        return "\n".join(lines)
+        ])
 
     @staticmethod
     def think() -> str:
-        """随机思考内容（静态）"""
         thoughts = [
-            "已思考{}秒…谭x没有1米7！".format(random.randint(2,8)),
+            "已思考{}秒…谭x没有1米7！".format(random.randint(2, 8)),
             "如果曹xx是gay会发生什么？",
             "人之初，性本……饿啊(摔了一跤)",
             "怎么感觉有人在看我？错觉吗……",
@@ -78,11 +81,9 @@ class ControlFriendByFriend:
         ]
         return random.choice(thoughts)
 
-    @staticmethod
-    def sleep() -> str:
-        """睡觉时的梦话（静态）"""
+    def sleep(self) -> str:
         dreams = [
-            "从{}岁长到{}岁要多久呢……zzZ".format(22, 32),  # 使用占位，实际年龄可动态，但这里不重要
+            f"从{self.age}岁长到{self.age + 10}岁要多久呢……zzZ",
             "和女神xxoo原来是这种感觉吗……快炸膛了🥵",
             "报告塔台！我已起飞！🫡",
             '"队友队友你为啥射得那么准？"\n"因为……她离开我了😭"',
@@ -94,7 +95,6 @@ class ControlFriendByFriend:
 
     @staticmethod
     def eat() -> str:
-        """吃饭时的台词（静态）"""
         foods = [
             "🍔 汉堡真好吃！",
             "🍣 寿司太新鲜了！",
@@ -107,7 +107,6 @@ class ControlFriendByFriend:
 
     @staticmethod
     def play() -> str:
-        """玩耍时的台词（静态）"""
         plays = [
             "🎮 来局游戏吧！",
             "⚽ 踢球去！",
@@ -118,10 +117,8 @@ class ControlFriendByFriend:
         ]
         return random.choice(plays)
 
-
-# ==================== 页面样式 ====================
+# ==================== 样式 ====================
 def set_pixel_style():
-    """注入像素风格 CSS"""
     st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -164,7 +161,6 @@ def set_pixel_style():
             .pixel-font { font-size: 11px !important; }
             .stButton>button { font-size: 10px !important; }
         }
-        /* 场景内的像素风格 */
         .pixel-scene {
             background-color: #1a1a2e;
             border: 4px solid #8BFF8B;
@@ -176,27 +172,20 @@ def set_pixel_style():
     </style>
     """, unsafe_allow_html=True)
 
-
-# ==================== 初始化会话状态 ====================
+# ==================== 初始化 ====================
 def init_session():
-    """初始化 streamlit 会话状态变量"""
     if "step" not in st.session_state:
-        st.session_state.step = "init"          # init / game
+        st.session_state.step = "init"
         st.session_state.friend = None
         st.session_state.messages = []
         st.session_state.last_action_time = time.time()
         st.session_state.timeout = random.uniform(MIN_TIMEOUT, MAX_TIMEOUT)
-
-        # 房屋场景相关
         st.session_state.char_x = SCENE_WIDTH // 2 - CHAR_SIZE // 2
         st.session_state.char_y = SCENE_HEIGHT // 2 - CHAR_SIZE // 2
         st.session_state.last_move_time = time.time()
-        st.session_state.component_value = None   # 存储来自自定义组件的交互数据
+        st.session_state.component_value = None   # 用于存放组件返回值
 
-
-# ==================== 初始化页面（角色创建） ====================
 def init_page():
-    """角色创建界面"""
     st.markdown("<h1 class='pixel-font'>🎮 创建你的像素朋友</h1>", unsafe_allow_html=True)
     with st.container():
         col1, col2 = st.columns(2)
@@ -206,12 +195,9 @@ def init_page():
         with col2:
             height = st.number_input("身高 (cm)", min_value=50.0, max_value=250.0, value=165.0, step=0.5)
             weight = st.number_input("体重 (kg)", min_value=20.0, max_value=300.0, value=50.0, step=0.5)
-
         if st.button("🎮 开始游戏", use_container_width=True):
             st.session_state.friend = ControlFriendByFriend(name, age, height, weight)
-            st.session_state.messages = [
-                f"🎮 欢迎，{name}！和我互动吧～"
-            ]
+            st.session_state.messages = [f"🎮 欢迎，{name}！和我互动吧～"]
             st.session_state.step = "game"
             st.session_state.last_action_time = time.time()
             st.session_state.timeout = random.uniform(MIN_TIMEOUT, MAX_TIMEOUT)
@@ -220,11 +206,7 @@ def init_page():
             st.session_state.last_move_time = time.time()
             st.rerun()
 
-
-# ==================== 构建房屋场景 HTML ====================
 def build_scene_html(char_x, char_y, furniture):
-    """生成像素房屋场景的 HTML 代码（包含交互脚本）"""
-    # 家具 HTML
     furniture_html = ""
     for item in furniture:
         furniture_html += f"""
@@ -239,18 +221,14 @@ def build_scene_html(char_x, char_y, furniture):
             {item['label']}
         </div>
         """
-
     html = f"""
     <div id="scene-container" style="position:relative; width:{SCENE_WIDTH}px; height:{SCENE_HEIGHT}px; 
           background-color:#2d2d2d; border:4px solid #8BFF8B; image-rendering:pixelated; overflow:hidden; margin:auto;">
-        <!-- 地板纹理（像素感） -->
         <div style="position:absolute; width:100%; height:100%; background-image: 
              repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(255,255,255,0.03) 20px, rgba(255,255,255,0.03) 21px), 
              repeating-linear-gradient(90deg, transparent, transparent 20px, rgba(255,255,255,0.03) 20px, rgba(255,255,255,0.03) 21px);">
         </div>
-        <!-- 家具 -->
         {furniture_html}
-        <!-- 角色 -->
         <div id="character" style="position:absolute; left:{char_x}px; top:{char_y}px; 
              width:{CHAR_SIZE}px; height:{CHAR_SIZE}px; 
              background-color:#FFD700; border:2px solid #000; border-radius:50%; 
@@ -259,7 +237,6 @@ def build_scene_html(char_x, char_y, furniture):
              box-shadow: 0 0 0 2px #000, 2px 2px 0 0 #000;">
             😊
         </div>
-        <!-- 提示 -->
         <div style="position:absolute; bottom:5px; left:5px; color:#8BFF8B; font-size:10px; font-family:'Press Start 2P', monospace; opacity:0.6;">
             🖱️ 拖动小人 | 点击家具互动
         </div>
@@ -267,7 +244,6 @@ def build_scene_html(char_x, char_y, furniture):
     <script src="https://cdn.jsdelivr.net/npm/streamlit-component-lib@1.0.0/dist/streamlit-component-lib.js"></script>
     <script>
         (function() {{
-            // 角色拖拽逻辑
             const charEl = document.getElementById('character');
             let isDragging = false;
             let offsetX = 0, offsetY = 0;
@@ -275,16 +251,13 @@ def build_scene_html(char_x, char_y, furniture):
             const charSize = {CHAR_SIZE};
             const sceneWidth = {SCENE_WIDTH};
             const sceneHeight = {SCENE_HEIGHT};
-
             function clamp(val, min, max) {{
                 return Math.min(Math.max(val, min), max);
             }}
-
             function sendPosition(x, y) {{
                 const data = {{ type: 'move', x: x, y: y }};
                 Streamlit.setComponentValue(data);
             }}
-
             charEl.addEventListener('mousedown', function(e) {{
                 isDragging = true;
                 const rect = charEl.getBoundingClientRect();
@@ -293,7 +266,6 @@ def build_scene_html(char_x, char_y, furniture):
                 charEl.style.cursor = 'grabbing';
                 e.preventDefault();
             }});
-
             document.addEventListener('mousemove', function(e) {{
                 if (!isDragging) return;
                 const containerRectNow = container.getBoundingClientRect();
@@ -305,7 +277,6 @@ def build_scene_html(char_x, char_y, furniture):
                 charEl.style.top = newY + 'px';
                 e.preventDefault();
             }});
-
             document.addEventListener('mouseup', function(e) {{
                 if (isDragging) {{
                     isDragging = false;
@@ -317,8 +288,6 @@ def build_scene_html(char_x, char_y, furniture):
                     }}
                 }}
             }});
-
-            // 家具点击事件
             const furnitures = document.querySelectorAll('[id^="furniture-"]');
             furnitures.forEach(function(el) {{
                 el.addEventListener('click', function(e) {{
@@ -341,44 +310,47 @@ def build_scene_html(char_x, char_y, furniture):
     """
     return html
 
-
-# ==================== 消息管理辅助 ====================
 def append_message(msg: str):
-    """添加消息并自动限制长度"""
     st.session_state.messages.append(msg)
     if len(st.session_state.messages) > MAX_MESSAGES:
         st.session_state.messages = st.session_state.messages[-MAX_MESSAGES:]
 
+def _reset_timer():
+    st.session_state.last_action_time = time.time()
+    st.session_state.timeout = random.uniform(MIN_TIMEOUT, MAX_TIMEOUT)
 
-# ==================== 游戏主界面 ====================
 def game_page():
-    """游戏运行界面（自动刷新 + 超时思考 + 房屋场景）"""
-    st_autorefresh(interval=REFRESH_INTERVAL, limit=None, key="game_refresh")
+    if AUTOREFRESH_AVAILABLE:
+        st_autorefresh(interval=REFRESH_INTERVAL, limit=None, key="game_refresh")
+    else:
+        st.caption("🔄 自动刷新不可用，请手动刷新页面（F5）查看最新状态。")
 
     friend = st.session_state.friend
     messages = st.session_state.messages
 
-    # ===== 处理自定义组件返回的数据 =====
+    # ===== 第一步：处理上次组件返回值（如果存在） =====
     if st.session_state.component_value is not None:
         data = st.session_state.component_value
-        if data.get("type") == "move":
-            new_x = data.get("x")
-            new_y = data.get("y")
-            if new_x is not None and new_y is not None:
-                st.session_state.char_x = new_x
-                st.session_state.char_y = new_y
-                st.session_state.last_move_time = time.time()  # 重置移动计时
-        elif data.get("type") == "weigh":
-            append_message(f"⚖️ 体重秤显示：{friend.weight} kg")
-        elif data.get("type") == "bed":
-            append_message(f"💤 {ControlFriendByFriend.sleep()}")
-        elif data.get("type") == "table":
-            append_message(f"🍽️ {ControlFriendByFriend.eat()}")
-        # 清空，防止重复处理
+        if isinstance(data, dict):
+            if data.get("type") == "move":
+                new_x = data.get("x")
+                new_y = data.get("y")
+                if new_x is not None and new_y is not None:
+                    st.session_state.char_x = new_x
+                    st.session_state.char_y = new_y
+                    st.session_state.last_move_time = time.time()  # 重置自动移动计时
+            elif data.get("type") == "weigh":
+                append_message(f"⚖️ 体重秤显示：{friend.weight} kg")
+            elif data.get("type") == "bed":
+                append_message(f"💤 {friend.sleep()}")
+            elif data.get("type") == "table":
+                append_message(f"🍽️ {ControlFriendByFriend.eat()}")
+        # 清空已处理
         st.session_state.component_value = None
+        # 立即刷新以显示新消息或位置
         st.rerun()
 
-    # ===== 自动移动逻辑 =====
+    # ===== 自动移动 =====
     now = time.time()
     if now - st.session_state.last_move_time >= MOVE_INTERVAL:
         dx = random.randint(-8, 8)
@@ -391,15 +363,14 @@ def game_page():
         st.session_state.char_y = new_y
         st.session_state.last_move_time = now
 
-    # ===== 自动思考超时 =====
+    # ===== 自动思考 =====
     elapsed = now - st.session_state.last_action_time
     if elapsed >= st.session_state.timeout:
         append_message(f"🤔 {ControlFriendByFriend.think()}")
         st.session_state.last_action_time = now
         st.session_state.timeout = random.uniform(MIN_TIMEOUT, MAX_TIMEOUT)
-        st.rerun()
 
-    # ===== 显示状态栏 =====
+    # ===== 界面布局 =====
     st.markdown(f"""
     <div class='pixel-box'>
         <div class='pixel-font' style='font-size:16px;'>
@@ -408,37 +379,35 @@ def game_page():
     </div>
     """, unsafe_allow_html=True)
 
-    # ===== 房屋场景 =====
+    # 房屋场景
     st.markdown("<div class='pixel-scene'>", unsafe_allow_html=True)
     furniture = [
         {"id": "table", "x": 30, "y": 30, "width": 60, "height": 60, "color": "#8B4513", "label": "桌子"},
         {"id": "bed", "x": 450, "y": 280, "width": 100, "height": 60, "color": "#A52A2A", "label": "床"},
         {"id": "scale", "x": 250, "y": 320, "width": 50, "height": 50, "color": "#C0C0C0", "label": "秤"},
     ]
-    scene_html = build_scene_html(
-        st.session_state.char_x,
-        st.session_state.char_y,
-        furniture
-    )
+    scene_html = build_scene_html(st.session_state.char_x, st.session_state.char_y, furniture)
     result = st.components.v1.html(scene_html, height=SCENE_HEIGHT + 30, scrolling=False)
+
+    # ===== 第二步：保存组件返回值，供下次运行处理 =====
     if result is not None:
         st.session_state.component_value = result
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ===== 消息记录区域 =====
+    # 消息记录
     st.markdown("<div class='pixel-box'>", unsafe_allow_html=True)
     for msg in messages:
         msg_formatted = msg.replace("\n", "<br>")
-        st.markdown(f"<div class='pixel-font' style='font-size:14px;'>{msg_formatted}</div>",
-                    unsafe_allow_html=True)
+        st.markdown(f"<div class='pixel-font' style='font-size:14px;'>{msg_formatted}</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ===== 倒计时进度条 =====
+    # 倒计时进度条
     remaining = max(0.0, st.session_state.timeout - elapsed)
     progress = min(1.0, elapsed / st.session_state.timeout) if st.session_state.timeout > 0 else 0.0
     st.progress(progress, text=f"⏳ 下次自动思考倒计时 {remaining:.1f} 秒")
 
-    # ===== 操作按钮 =====
+    # 操作按钮
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         if st.button("💬 聊天", use_container_width=True):
@@ -447,7 +416,7 @@ def game_page():
             st.rerun()
     with col2:
         if st.button("💤 睡觉", use_container_width=True):
-            append_message(f"💤 {ControlFriendByFriend.sleep()}")
+            append_message(f"💤 {friend.sleep()}")
             _reset_timer()
             st.rerun()
     with col3:
@@ -468,23 +437,14 @@ def game_page():
 
     st.caption("🎮 点击按钮互动，超时将自动触发随机思考。拖动小人走动，点击家具触发事件。")
 
-
-def _reset_timer():
-    """重置自动思考计时器"""
-    st.session_state.last_action_time = time.time()
-    st.session_state.timeout = random.uniform(MIN_TIMEOUT, MAX_TIMEOUT)
-
-
 # ==================== 主入口 ====================
 def main():
     set_pixel_style()
     init_session()
-
     if st.session_state.step == "init":
         init_page()
     else:
         game_page()
-
 
 if __name__ == "__main__":
     main()
